@@ -1,30 +1,19 @@
 const ethers = require('ethers')
-const mainAbi = require('../abi/main.abi.json')
-const materialsAbi = require('../abi/materials.abi.json')
+const mainAbi = require('../abi/main-abi.json')
+const materialsAbi = require('../abi/materials-abi.json')
 const config = require('../config.js')
-
+const countAdventurers = require('./count-adventurers.js')
 require('dotenv').config()
 //
-;(async () => {
+const sendMaterialsFarming = async () => {
 	const provider = new ethers.providers.JsonRpcProvider(
 		`https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_POLYGON_API_KEY}`
 	)
 	const privateKey = process.env.PRIVATE_KEY
 	const wallet = new ethers.Wallet(privateKey, provider)
-	const mainContractAddress = config.contracts.main
 	const materialsContractAddress = config.contracts.materials
-	const mainContract = new ethers.Contract(mainContractAddress, mainAbi, wallet)
 	const materialsContract = new ethers.Contract(materialsContractAddress, materialsAbi, wallet)
-	const callAdventurerBalance = await mainContract.balanceOf(wallet.address)
-	const adventurerNumber = callAdventurerBalance.toNumber()
-
-	// count how many adventurers are in account
-	const allAdventurers = []
-	for (let i = 0; i < adventurerNumber; i++) {
-		const adventurerId = await mainContract.tokenOfOwnerByIndex(wallet.address, i)
-		allAdventurers.push(adventurerId.toNumber())
-	}
-	console.log(allAdventurers)
+	const allAdventurers = await countAdventurers.retrieveAdventurers()
 
 	//check if adventurer is available for adventure
 	const readyAdventurers = []
@@ -36,11 +25,15 @@ require('dotenv').config()
 		}
 	}
 	console.log(readyAdventurers)
-
-	// for loop to send each adventurer to adventure
-	for (let i = 0; i < readyAdventurers.length; i++) {
-		await materialsContract.adventure(readyAdventurers[i])
+	if (readyAdventurers.length > 0) {
+		// for loop to send each adventurer to adventure
+		for (let i = 0; i < readyAdventurers.length; i++) {
+			await materialsContract.adventure(readyAdventurers[i])
+		}
+		return `${readyAdventurers.length} eligible adventurers were sent to farm materials.`
 	}
-})().catch((err) => {
-	console.error(err)
-})
+	return 'No eligible adventurers were found.'
+}
+module.exports = {
+	sendMaterialsFarming,
+}
